@@ -1,0 +1,312 @@
+/*
+ * main.c
+ *
+ *  Created on: Feb 3, 2022
+ *      Author: aurisb
+ */
+
+// InputOutput.c
+// Runs on MSP432
+// Test the GPIO initialization functions by setting the LED
+// color according to the status of the switches.
+// Only SW1 makes color LED blue, and red LED on
+// Only SW2 makes color LED red, and red LED on
+// Both SW1 and SW2 makes color LED purple, and red LED on
+// Neither SW1 or SW2 turns LEDs off
+
+// Daniel and Jonathan Valvano
+// September 23, 2017
+
+/* This example accompanies the book
+   "Embedded Systems: Introduction to Robotics,
+   Jonathan W. Valvano, ISBN: 9781074544300, copyright (c) 2019
+ For more information about my classes, my research, and my books, see
+ http://users.ece.utexas.edu/~valvano/
+
+Simplified BSD License (FreeBSD License)
+Copyright (c) 2019, Jonathan Valvano, All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The views and conclusions contained in the software and documentation are
+those of the authors and should not be interpreted as representing official
+policies, either expressed or implied, of the FreeBSD Project.
+*/
+
+// built-in LED1 connected to P1.0
+// negative logic built-in Button 1 connected to P1.1
+// negative logic built-in Button 2 connected to P1.4
+// built-in red LED connected to P2.0
+// built-in green LED connected to P2.1
+// built-in blue LED connected to P2.2
+// Color    LED(s) Port2
+// dark     ---    0
+// red      R--    0x01
+// blue     --B    0x04
+// green    -G-    0x02
+// yellow   RG-    0x03
+// sky blue -GB    0x06
+// white    RGB    0x07
+// pink     R-B    0x05
+#include <stdint.h>
+#include "msp.h"
+
+#define SW1       0x02                  // on the left side of the LaunchPad board
+#define SW2       0x10                  // on the right side of the LaunchPad board
+#define RED       0x01
+#define GREEN     0x02
+#define BLUE      0x04
+
+//MY EDITS START HERE
+#define TOPSW   0x40
+#define BOTSW   0x80
+#define TOPLED  0x04
+#define BOTLED  0x08
+//SETTING UP MY INPUTS 2.6 and 2.7
+void Port2_Init_MINE(void){ //this is the code for setting a pull up input MAKE YOUR INPUTS HERE
+  P2->SEL0 &= ~0xC0;
+  P2->SEL1 &= ~0xC0;   // 1) configure P2.6  P2.7 as GPIO      //
+  P2->DIR &= ~0xC0;    // 2) make P2.6 and P2.7 in                  //
+  P2->REN |= 0xC0;     // 3) enable pull resistors on P2.6 and P2.7 //
+  P2->OUT |= 0xC0;     //    P2.6 and P2.7 are pull-up              //
+}
+
+//SETTING UP MY OUTPUTS 3.2 AND 3.3
+void Port3_Init_MINE(void){ //this is the code for setting up an output MAKE YOUR OUTPUT HERE
+  P3->SEL0 &= ~0x0C;
+  P3->SEL1 &= ~0x0C;    // 1) configure P3.2 and P3.3 as GPIO
+  P3->DIR |= 0x0C;      // 2) make P3.2 and P3.3 out
+  P3->DS |= 0x0C;       // 3) activate increased drive strength
+  //P3->OUT &= ~0x0C;     //    all LEDs off
+  P3->OUT |= 0x0C;     //    all LEDs on
+}
+
+uint8_t Port2_Input_MINE(void){
+  return (P2->IN&0xC0);                   // read P1.4,P1.1 inputs
+}
+
+void Port3_Output_MINE(uint8_t data){        // write all of P2 outputs
+  P3->OUT = data;
+}
+
+
+int main(void){ uint8_t status;
+  Port2_Init_MINE();                         //initialize 2.6 and 2.7 as our input
+  Port3_Init_MINE();                         // initialize P3.2 and P3.3 and make them outputs
+
+  //testing output
+  Port3_Output_MINE(TOPLED+BOTLED);
+
+
+  while(1){
+    status = Port2_Input_MINE();
+    switch(status){                 // switches are negative logic on P1.1 and P1.4
+      case 0x40:                    // BOTSW pressed
+        Port3_Output_MINE(BOTLED);
+        break;
+      case 0x80:                    // TOPSW pressed
+        Port3_Output_MINE(TOPLED);
+        break;
+      case 0xC0:                    // NEITHER switches pressed
+        Port3_Output_MINE(0x00);
+        //Port1_Output(1);
+        break;
+      case 0x00:                    // BOTH switch pressed
+        Port3_Output_MINE(TOPLED+BOTLED);
+        //Port1_Output(0);
+        break;
+    }
+  }
+}
+
+//END OF MY CODE
+
+/*
+// Version 1 is unfriendly
+void Port1_Init(void){
+  P1->SEL0 = 0x00;
+  P1->SEL1 = 0x00;                        // configure P1.4 and P1.1 as GPIO
+  P1->DIR = 0x01;                         // make P1.4 and P1.1 in, P1.0 output
+  P1->REN = 0x12;                         // enable pull resistors on P1.4 and P1.1
+  P1->OUT = 0x12;                         // P1.4 and P1.1 are pull-up
+}
+uint8_t Port1_Input(void){
+  return (P1->IN&0x12);                   // read P1.4,P1.1 inputs
+}
+
+
+void Port2_Init(void){
+  P2->SEL0 = 0x00;
+  P2->SEL1 = 0x00;                        // configure P2.2-P2.0 as GPIO
+  P2->DS = 0x07;                          // make P2.2-P2.0 high drive strength
+  P2->DIR = 0x07;                         // make P2.2-P2.0 out
+  P2->OUT = 0x00;                         // all LEDs off
+}
+void Port1_Output(uint8_t data){        // write all of P1.0 outputs
+  P1->OUT = (P1->OUT&0xFE)|data;
+}
+void Port2_Output(uint8_t data){        // write all of P2 outputs
+  P2->OUT = data;
+}
+
+
+
+int main_old(void){ uint8_t status;
+  Port1_Init();                         // initialize P1.1 and P1.4 and make them inputs (P1.1 and P1.4 built-in buttons)
+                                        // initialize P1.0 as output to red LED
+  Port2_Init();                         // initialize P2.2-P2.0 and make them outputs (P2.2-P2.0 built-in LEDs)
+  while(1){
+    status = Port1_Input();
+    switch(status){                 // switches are negative logic on P1.1 and P1.4
+      case 0x10:                    // SW1 pressed
+        Port2_Output(RED+GREEN);
+        Port1_Output(1);
+        break;
+      case 0x02:                    // SW2 pressed
+        Port2_Output(GREEN+BLUE);
+        Port1_Output(1);
+        break;
+      case 0x00:                    // both switches pressed
+        Port2_Output(BLUE+RED+GREEN);
+        Port1_Output(1);
+        break;
+      case 0x12:                    // neither switch pressed
+        Port2_Output(GREEN);
+        Port1_Output(0);
+        break;
+    }
+  }
+}
+
+
+// Version 2 version is friendly
+void Port1_Init2(void){ //this is the code for setting a pull up input MAKE YOUR INPUTS HERE
+  P1->SEL0 &= ~0x13;
+  P1->SEL1 &= ~0x13;   // 1) configure P1.4  P1.1 P1.0 as GPIO      //
+  P1->DIR &= ~0x12;    // 2) make P1.4 and P1.1 in                  //
+  P1->DIR |= 0x01;     // 2) make P1.0 out                          //
+  P1->REN |= 0x12;     // 3) enable pull resistors on P1.4 and P1.1 //
+  P1->OUT |= 0x12;     //    P1.4 and P1.1 are pull-up              //
+}
+uint8_t Port1_Input2(void){
+  return (P1->IN&0x12);   // read P1.4,P1.1 inputs
+}
+void Port1_Output2(uint8_t data){  // write output to P1.0
+  P1->OUT = (P1->OUT&0xFE)|data;
+}
+void Port2_Init2(void){ //this is the code for setting up an output MAKE YOUR OUTPUT HERE
+  P2->SEL0 &= ~0x07;
+  P2->SEL1 &= ~0x07;    // 1) configure P2.2-P2.0 as GPIO
+  P2->DIR |= 0x07;      // 2) make P2.2-P2.0 out
+  P2->DS |= 0x07;       // 3) activate increased drive strength
+  P2->OUT &= ~0x07;     //    all LEDs off
+}
+void Port2_Output2(uint8_t data){  // write three outputs bits of P2
+  P2->OUT = (P2->OUT&0xF8)|data;
+}
+int main2(void){ uint8_t status;
+  Port1_Init2();                    // initialize P1.1 and P1.4 and make them inputs (P1.1 and P1.4 built-in buttons)
+                                    // initialize P1.0 as output to red LED
+  Port2_Init2();                    // initialize P2.2-P2.0 and make them outputs (P2.2-P2.0 built-in LEDs)
+  while(1){
+    status = Port1_Input2();
+    switch(status){                 // switches are negative logic on P1.1 and P1.4
+      case 0x10:                    // SW1 pressed
+        Port2_Output2(BLUE);
+        Port1_Output2(1);
+        break;
+      case 0x02:                    // SW2 pressed
+        Port2_Output2(RED);
+        Port1_Output2(1);
+        break;
+      case 0x00:                    // both switches pressed
+        Port2_Output2(BLUE+RED);
+        Port1_Output2(1);
+        break;
+      case 0x12:                    // neither switch pressed
+        Port2_Output2(0);
+        Port1_Output2(0);
+        break;
+    }
+  }
+}
+
+// Version 3 provides for abstraction
+void Switch_Init(void){
+  P1->SEL0 &= ~0x12;
+  P1->SEL1 &= ~0x12;    // 1) configure P1.4 and P1.1 as GPIO
+  P1->DIR &= ~0x12;     // 2) make P1.4 and P1.1 in
+  P1->REN |= 0x12;      // 3) enable pull resistors on P1.4 and P1.1
+  P1->OUT |= 0x12;      //    P1.4 and P1.1 are pull-up
+}
+// bit-banded addresses, positive logic
+#define SW2IN ((*((volatile uint8_t *)(0x42098010)))^1)
+#define SW1IN ((*((volatile uint8_t *)(0x42098004)))^1)
+
+void RedLED_Init(void){
+  P1->SEL0 &= ~0x01;
+  P1->SEL1 &= ~0x01;   // 1) configure P1.0 as GPIO
+  P1->DIR |= 0x01;     // 2) make P1.0 out
+}
+
+// bit-banded address
+#define REDLED (*((volatile uint8_t *)(0x42098040)))
+
+void ColorLED_Init(void){
+  P2->SEL0 &= ~0x07;
+  P2->SEL1 &= ~0x07;    // 1) configure P2.2-P2.0 as GPIO
+  P2->DIR |= 0x07;      // 2) make P2.2-P2.0 out
+  P2->DS |= 0x07;       // 3) activate increased drive strength
+  P2->OUT &= ~0x07;     //    all LEDs off
+}
+// bit-banded addresses
+#define BLUEOUT  (*((volatile uint8_t *)(0x42098068)))
+#define GREENOUT (*((volatile uint8_t *)(0x42098064)))
+#define REDOUT   (*((volatile uint8_t *)(0x42098060)))
+
+int main3(void){
+  Switch_Init();
+  ColorLED_Init();
+  RedLED_Init();
+  GREENOUT = 0;
+  while(1){
+    if(SW1IN||SW2IN){ // Single Red on if either is pressed
+      REDLED=1;
+    }else{
+      REDLED=0;
+    }
+    if(SW1IN){ // Color=Blue if SW1 is pressed
+      BLUEOUT = 1;
+    }else{
+      BLUEOUT = 0;
+    }
+    if(SW2IN){ // Color=Red if SW2 is pressed
+      REDOUT = 1;
+    }else{
+      REDOUT = 0;
+    }
+  }
+}
+*/
+
+
+
+
